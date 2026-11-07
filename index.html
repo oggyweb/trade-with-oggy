@@ -946,20 +946,27 @@
         }
       }
 
-      // Hide Fullscreen Loading Screen on Load
-      window.addEventListener('load', () => {
-        renderMarketsList();
-        initCanvasResize();
-        initActiveTradesGrid();
-        initSignalLogs();
-        updateLdpUI();
-        connectDerivWebSocket();
+      // Safe startup initializer ensuring loader always hides successfully
+      window.addEventListener('DOMContentLoaded', () => {
+        try {
+          renderMarketsList();
+          initCanvasResize();
+          initActiveTradesGrid();
+          initSignalLogs();
+          updateLdpUI();
+          connectDerivWebSocket();
+        } catch(err) {
+          console.error("Initialization error caught:", err);
+        }
 
+        // Guaranteed Fullscreen Loader removal after 1.2 seconds
         setTimeout(() => {
           const loader = document.getElementById('oggyLoadingScreen');
           if (loader) {
             loader.style.opacity = '0';
-            setTimeout(() => { loader.style.display = 'none'; }, 500);
+            setTimeout(() => { 
+              loader.style.display = 'none'; 
+            }, 500);
           }
         }, 1200);
       });
