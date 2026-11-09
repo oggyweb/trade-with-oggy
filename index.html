@@ -3,6 +3,9 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Deriv Domain Verification Meta Tag -->
+    <meta name="deriv-site-verification" content="270926da965bac764b6081ce2f65e3fa82ae8640718acac8c4ab1ca9c7448bc6">
+    
     <title>TRADING WITH OGGY - Deriv Volatility Signals & Live Charting Platform</title>
     <meta name="description" content="TRADING WITH OGGY - Real-time Deriv Volatility Indices charting, tick streaming, RSI Rise/Fall signals, Even/Odd LDP analysis, Over/Under pattern detection, and high-win rate trading execution." />
     
@@ -505,7 +508,6 @@
               wsStatus.innerText = 'DISCONNECTED - RECONNECTING... 🔄';
               wsStatus.className = 'text-oggyYellow font-mono text-[10px]';
             }
-            // 520 Error හෝ loop එක වැළැක්වීමට තත්පර 5ක පමාවක් යොදා ඇත
             setTimeout(connectDerivWebSocket, 5000);
           };
         } catch(e) {
@@ -807,7 +809,7 @@
         if (btn) {
           btn.innerHTML = audioEnabled 
             ? `<svg class="w-3.5 h-3.5 text-oggyGreen" fill="currentColor" viewBox="0 0 20 20"><path d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414z"/></svg><span class="text-[11px] font-sans font-bold">ALERTS ON</span>`
-            : `<svg class="w-3.5 h-3.5 text-red-400" fill="currentColor" viewBox="0 0 20 20"><path d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM12.293 7.293a1 1 0 011.414 0L15 8.586l1.293-1.293a1 1 0 111.414 1.414L16.414 10l1.293 1.293a1 1 0 01-1.414 1.414L15 11.414l-1.293 1.293a1 1 0 01-1.414-1.414L13.586 10l-1.293-1.293a1 1 0 010-1.414z"/></svg><span class="text-[11px] font-sans font-bold">ALERTS OFF</span>`;
+            : `<svg class="w-3.5 h-3.5 text-red-400" fill="currentColor" viewBox="0 0 20 20"><path d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM12.293 7.293a1 1 0 011.414 0L15 8.586l1.293-1.293a1 1 0 111.414 1.414L16.414 10l1.293 1.293a1 1 0 01-1.414 1.414L15 11.414l-1.293 1.293a1 1 0 01-1.414-1.414L13.586 10l-1.293-1.293a1 1 0 010-1.414 z"/></svg><span class="text-[11px] font-sans font-bold">ALERTS OFF</span>`;
         }
       }
 
