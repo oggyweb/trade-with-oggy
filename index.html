@@ -403,8 +403,8 @@
 
     <!-- MAIN JAVASCRIPT ENGINE (PURE REAL MARKET) -->
     <script>
-      // ඔබේ සැබෑ Deriv App ID එක මෙහි ඇතුළත් කර ඇත
-      const APP_ID = '34UtCExfb7AMVP9Ecde38';
+      // ඔබගේ අලුත් Deriv App ID එක මෙහි ඇතුළත් කර ඇත
+      const APP_ID = '34UuGAa1xuXgNbhgzYUGA';
       let ws = null;
       let audioEnabled = true;
       let lastSignalTriggered = null;
@@ -505,7 +505,8 @@
               wsStatus.innerText = 'DISCONNECTED - RECONNECTING... 🔄';
               wsStatus.className = 'text-oggyYellow font-mono text-[10px]';
             }
-            setTimeout(connectDerivWebSocket, 3000);
+            // 520 Error හෝ loop එක වැළැක්වීමට තත්පර 5ක පමාවක් යොදා ඇත
+            setTimeout(connectDerivWebSocket, 5000);
           };
         } catch(e) {
           console.error(e);
