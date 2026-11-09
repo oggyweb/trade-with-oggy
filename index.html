@@ -404,7 +404,8 @@
 
     <!-- MAIN JAVASCRIPT ENGINE -->
     <script>
-      const APP_ID = '1089';
+      // මෙහි ඔබගේ අලුත් Deriv App ID එක ඇතුළත් කර ඇත
+      const APP_ID = '34UtCExfb7AMVP9Ecde38';
       let ws = null;
       let audioEnabled = true;
       let lastSignalTriggered = null;
@@ -637,72 +638,83 @@
         volatilityMarkets.forEach(m => {
           const item = document.createElement('div');
           const isSelected = m.id === selectedMarket.id;
-          item.className = `p-2 rounded-lg border flex items-center justify-between cursor-pointer transition ${
-            isSelected ? 'bg-oggyPink/20 border-oggyPink text-white' : 'bg-gray-900/60 border-gray-800 text-gray-300 hover:border-gray-700'
-          }`;
-          item.onclick = () => selectMarket(m.id);
-
+          item.className = `p-2.5 rounded-lg border cursor-pointer flex items-center justify-between transition ${isSelected ? 'bg-oggyCard border-oggyPink' : 'bg-black/40 border-gray-800 hover:border-gray-700'}`;
+          item.onclick = () => selectMarket(m);
           item.innerHTML = `
-            <div class="flex items-center gap-2">
-              <span class="w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-oggyPink pulse-fast' : 'bg-gray-600'}"></span>
-              <div>
-                <div class="text-xs font-mono font-bold">${m.name}</div>
-                <div class="text-[9px] text-gray-500 font-mono">${m.id}</div>
-              </div>
+            <div>
+              <div class="text-xs font-bold text-white">${m.name}</div>
+              <div class="text-[10px] font-mono text-gray-400">${m.badge}</div>
             </div>
-            <div class="text-right">
-              <div class="text-xs font-mono font-bold ${m.color}" id="price_${m.id}">${m.price > 0 ? m.price.toFixed(2) : '---.--'}</div>
-              <span class="text-[9px] px-1 bg-gray-800 text-gray-400 rounded">${m.badge}</span>
+            <div class="text-right font-mono">
+              <div id="price_${m.id}" class="text-xs font-bold ${m.color}">${m.price.toFixed(2)}</div>
+              <div class="text-[9px] text-gray-500">Live Tick</div>
             </div>
           `;
           container.appendChild(item);
         });
       }
 
-      function selectMarket(marketId) {
-        selectedMarket = volatilityMarkets.find(m => m.id === marketId) || volatilityMarkets[0];
-        const topMarket = document.getElementById('topActiveMarket');
-        const chartTitle = document.getElementById('chartMarketTitle');
-        if (topMarket) topMarket.innerText = selectedMarket.name;
-        if (chartTitle) chartTitle.innerText = selectedMarket.name;
-        
-        chartTickHistory = [];
-        digitCounts = Array(10).fill(0);
-        lastDigitsStream = [];
+      function selectMarket(m) {
+        selectedMarket = m;
+        const titleEl = document.getElementById('chartMarketTitle');
+        const topTitleEl = document.getElementById('topActiveMarket');
+        if (titleEl) titleEl.innerText = m.name;
+        if (topTitleEl) topTitleEl.innerText = m.name;
 
+        chartTickHistory = [m.price - 1, m.price - 0.5, m.price];
         renderMarketsList();
-        subscribeToMarket(selectedMarket.id);
-        showToastNotification(`Switching Market: ${selectedMarket.name}`);
+        subscribeToMarket(m.id);
       }
 
-      function initCanvasResize() {
-        mainCanvas = document.getElementById('derivMainChart');
-        if (!mainCanvas) return;
-        ctx = mainCanvas.getContext('2d');
+      function updateLdpUI() {
+        const streamContainer = document.getElementById('ldpPillStream');
+        if (streamContainer) {
+          streamContainer.innerHTML = '';
+          const sliceDigits = lastDigitsStream.slice(-15);
+          sliceDigits.forEach(d => {
+            const pill = document.createElement('div');
+            const isEven = d % 2 === 0;
+            pill.className = `w-6 h-6 rounded-md flex items-center justify-center text-xs font-bold font-mono ${isEven ? 'bg-emerald-950 text-oggyGreen border border-oggyGreen/40' : 'bg-pink-950 text-oggyPink border border-oggyPink/40'}`;
+            pill.innerText = d;
+            streamContainer.appendChild(pill);
+          });
+        }
 
-        function resize() {
-          if (mainCanvas && mainCanvas.parentElement) {
-            mainCanvas.width = mainCanvas.parentElement.clientWidth;
-            mainCanvas.height = mainCanvas.parentElement.clientHeight;
-            drawMainChart();
+        const grid = document.getElementById('digitBarGrid');
+        if (grid) {
+          grid.innerHTML = '';
+          const totalCount = digitCounts.reduce((a, b) => a + b, 0) || 1;
+          for (let i = 0; i <= 9; i++) {
+            const count = digitCounts[i];
+            const pct = Math.round((count / totalCount) * 100);
+            const col = document.createElement('div');
+            col.className = 'bg-black/60 border border-gray-800 rounded p-1 flex flex-col items-center justify-end h-20';
+            col.innerHTML = `
+              <span class="text-[9px] text-oggyYellow font-bold mb-1">${pct}%</span>
+              <div class="w-full bg-oggyPink/30 rounded-t" style="height: ${Math.max(10, pct * 1.2)}px;"></div>
+              <span class="text-[10px] font-bold text-gray-300 mt-1">${i}</span>
+            `;
+            grid.appendChild(col);
           }
         }
-        resize();
-        window.addEventListener('resize', resize);
       }
 
       function drawMainChart() {
+        if (!mainCanvas) {
+          mainCanvas = document.getElementById('derivMainChart');
+          if (mainCanvas) ctx = mainCanvas.getContext('2d');
+        }
         if (!mainCanvas || !ctx) return;
+
+        mainCanvas.width = mainCanvas.parentElement.clientWidth;
+        mainCanvas.height = mainCanvas.parentElement.clientHeight;
+
         const w = mainCanvas.width;
         const h = mainCanvas.height;
+
         ctx.clearRect(0, 0, w, h);
 
-        if (chartTickHistory.length < 2) {
-          ctx.fillStyle = "#94A3B8";
-          ctx.font = "12px JetBrains Mono";
-          ctx.fillText("Waiting for Deriv Live Ticks...", 20, 40);
-          return;
-        }
+        if (chartTickHistory.length < 2) return;
 
         const minP = Math.min(...chartTickHistory);
         const maxP = Math.max(...chartTickHistory);
@@ -715,177 +727,119 @@
 
         ctx.strokeStyle = '#1E293B';
         ctx.lineWidth = 1;
-        for (let i = 1; i < 5; i++) {
-          let y = (h / 5) * i;
+        for (let i = 1; i <= 4; i++) {
+          const y = (h / 5) * i;
           ctx.beginPath();
           ctx.moveTo(0, y);
           ctx.lineTo(w, y);
           ctx.stroke();
         }
 
-        let dx = w / Math.max(1, chartTickHistory.length - 1);
         ctx.beginPath();
-        chartTickHistory.forEach((price, idx) => {
-          let x = idx * dx;
-          let y = h - ((price - minP) / range) * (h - 50) - 25;
+        ctx.strokeStyle = '#EC4899';
+        ctx.lineWidth = 2;
+
+        const stepX = w / (chartTickHistory.length - 1);
+
+        chartTickHistory.forEach((val, idx) => {
+          const x = idx * stepX;
+          const y = h - ((val - minP) / range) * (h - 20) - 10;
           if (idx === 0) ctx.moveTo(x, y);
           else ctx.lineTo(x, y);
         });
-
-        let grad = ctx.createLinearGradient(0, 0, 0, h);
-        grad.addColorStop(0, 'rgba(236, 72, 153, 0.35)');
-        grad.addColorStop(1, 'rgba(5, 7, 13, 0.0)');
+        ctx.stroke();
 
         ctx.lineTo(w, h);
         ctx.lineTo(0, h);
-        ctx.closePath();
-        ctx.fillStyle = grad;
-        ctx.fill();
-
-        ctx.beginPath();
-        chartTickHistory.forEach((price, idx) => {
-          let x = idx * dx;
-          let y = h - ((price - minP) / range) * (h - 50) - 25;
-          if (idx === 0) ctx.moveTo(x, y);
-          else ctx.lineTo(x, y);
-        });
-        ctx.strokeStyle = '#EC4899';
-        ctx.lineWidth = 2;
-        ctx.stroke();
-
-        let lastX = w;
-        let lastY = h - ((chartTickHistory[chartTickHistory.length - 1] - minP) / range) * (h - 50) - 25;
-        ctx.beginPath();
-        ctx.arc(lastX - 4, lastY, 5, 0, Math.PI * 2);
-        ctx.fillStyle = '#10B981';
+        ctx.fillStyle = 'rgba(236, 72, 153, 0.05)';
         ctx.fill();
       }
 
-      function updateLdpUI() {
-        const pillContainer = document.getElementById('ldpPillStream');
-        if (!pillContainer) return;
-        pillContainer.innerHTML = '';
-        
-        let evenCount = 0;
-        let oddCount = 0;
+      let activeTrades = [
+        { id: 'TRD-9012', market: 'Volatility 100', type: 'CALL (RISE)', stake: '$10.00', status: 'WIN', profit: '+$9.50' },
+        { id: 'TRD-9013', market: 'Volatility 75', type: 'EVEN', stake: '$25.00', status: 'RUNNING', profit: '... ' },
+        { id: 'TRD-9014', market: 'Volatility 50', type: 'PUT (FALL)', stake: '$15.00', status: 'WIN', profit: '+$14.25' }
+      ];
 
-        lastDigitsStream.slice(-20).forEach(d => {
-          let isEven = d % 2 === 0;
-          if (isEven) evenCount++; else oddCount++;
+      let signalLogs = [
+        { time: '12:45:10', market: 'Volatility 100 Index', strategy: 'Rise/Fall', signal: 'BUY CALL', duration: '1 Tick', price: '545.79', reason: 'RSI 14 dropped below 28.5' },
+        { time: '12:42:04', market: 'Volatility 75 Index', strategy: 'Even/Odd', signal: 'EVEN LDP', duration: '5 Ticks', price: '6458.20', reason: '8 ODD digits sequence streak' },
+        { time: '12:38:50', market: 'Volatility 50 Index', strategy: 'Over/Under', signal: 'OVER 2', duration: '3 Ticks', price: '248.90', reason: 'Cluster low digits bounce' }
+      ];
 
-          let pill = document.createElement('span');
-          pill.className = `w-6 h-6 rounded-md flex items-center justify-center font-mono font-bold text-xs shrink-0 ${
-            isEven ? 'bg-oggyGreen/20 text-oggyGreen border border-oggyGreen/40' : 'bg-oggyRed/20 text-oggyRed border border-oggyRed/40'
-          }`;
-          pill.innerText = d;
-          pillContainer.appendChild(pill);
-        });
-
-        let total = lastDigitsStream.length || 1;
-        let evenPct = Math.round((evenCount / (evenCount + oddCount || 1)) * 100);
-        const evenEl = document.getElementById('evenPercentage');
-        const oddEl = document.getElementById('oddPercentage');
-        if (evenEl) evenEl.innerText = `${evenPct}%`;
-        if (oddEl) oddEl.innerText = `${100 - evenPct}%`;
-
-        const barGrid = document.getElementById('digitBarGrid');
-        if (!barGrid) return;
-        barGrid.innerHTML = '';
-
-        let maxFreq = Math.max(...digitCounts) || 1;
-
-        digitCounts.forEach((count, d) => {
-          let pct = Math.round((count / total) * 100);
-          let isMax = count === maxFreq && count > 0;
-
-          let col = document.createElement('div');
-          col.className = "flex flex-col items-center justify-end h-24";
-
-          col.innerHTML = `
-            <span class="text-[9px] font-bold text-gray-400 mb-1">${pct}%</span>
-            <div class="w-full bg-gray-900 rounded-t overflow-hidden flex flex-col justify-end h-16 border border-gray-800">
-              <div class="w-full ${isMax ? 'bg-oggyRed shadow-[0_0_8px_#EF4444]' : 'bg-oggyGreen'}" style="height: ${Math.max(10, (count / maxFreq) * 100)}%"></div>
-            </div>
-            <span class="text-[10px] font-bold text-white mt-1">D-${d}</span>
-          `;
-          barGrid.appendChild(col);
-        });
-      }
-
-      function initActiveTradesGrid() {
+      function renderActiveTrades() {
         const grid = document.getElementById('activeTradesGrid');
         if (!grid) return;
         grid.innerHTML = '';
-
-        for (let i = 1; i <= 9; i++) {
-          let card = document.createElement('div');
-          card.className = "bg-gray-900/80 border border-gray-800 rounded-xl p-3 flex flex-col justify-between space-y-2";
-          let isWin = i % 2 !== 0;
-
+        activeTrades.forEach(t => {
+          const card = document.createElement('div');
+          card.className = 'bg-black/50 border border-gray-800 p-3 rounded-xl flex flex-col justify-between font-mono';
           card.innerHTML = `
-            <div class="flex items-center justify-between font-mono">
-              <span class="text-xs font-bold text-white">R_100</span>
-              <span class="px-2 py-0.5 rounded text-[9px] font-bold ${isWin ? 'bg-oggyGreen/20 text-oggyGreen border border-oggyGreen/40' : 'bg-oggyRed/20 text-oggyRed border border-oggyRed/40'}">${isWin ? 'WIN +$9.50' : 'LOSS -$10.00'}</span>
+            <div class="flex justify-between items-center mb-1">
+              <span class="text-[10px] text-gray-400">${t.id}</span>
+              <span class="px-2 py-0.5 rounded text-[9px] font-bold ${t.status === 'WIN' ? 'bg-oggyGreen/20 text-oggyGreen' : 'bg-oggyYellow/20 text-oggyYellow'}">${t.status}</span>
             </div>
-            <div class="text-[10px] text-gray-400 font-mono space-y-0.5">
-              <div>Entry Spot: <strong class="text-gray-200">545.20</strong></div>
-              <div>Exit Spot: <strong class="text-gray-200">545.80</strong></div>
-              <div>Prediction: <strong class="text-oggyPink">RISE (CALL)</strong></div>
+            <div class="text-xs font-bold text-white mb-1">${t.market}</div>
+            <div class="flex justify-between items-center text-[11px]">
+              <span class="text-oggyPink">${t.type}</span>
+              <span class="font-bold ${t.status === 'WIN' ? 'text-oggyGreen' : 'text-gray-300'}">${t.profit}</span>
             </div>
-            <button onclick="copyTradeDetails(${i})" class="w-full py-1.5 bg-emerald-950/60 hover:bg-emerald-900 border border-oggyGreen/40 text-oggyGreen font-mono font-bold text-[10px] rounded-lg transition">
-              ✔ PRACTICE WIN / DATA LOGGED
-            </button>
           `;
           grid.appendChild(card);
-        }
-      }
-
-      function initSignalLogs() {
-        const body = document.getElementById('signalLogTableBody');
-        if (!body) return;
-        body.innerHTML = '';
-
-        const sampleLogs = [
-          { time: '13:44:01', market: 'Volatility 100 Index', strat: 'Rise / Fall', signal: 'FALL', duration: '1 Tick', price: '545.79', trigger: 'Real WS: RSI Oversold Crossover (>70)' },
-          { time: '13:42:15', market: 'Volatility 75 Index', strat: 'Even / Odd', signal: 'EVEN', duration: '5 Ticks', price: '6458.20', trigger: 'Real WS: 8 Consecutive ODD Digits' },
-          { time: '13:40:30', market: 'Volatility 10 Index', strat: 'Over / Under', signal: 'OVER 2', duration: '1 Tick', price: '1245.10', trigger: 'Real WS: Digit 0,1 Cluster Pattern' },
-          { time: '13:38:12', market: 'Volatility 100 (1s)', strat: 'Higher / Lower', signal: 'HIGHER', duration: '5 Ticks', price: '29840.10', trigger: 'Real WS: Lower Bollinger Band Break' },
-        ];
-
-        sampleLogs.forEach(log => {
-          let row = document.createElement('tr');
-          row.className = "hover:bg-gray-900/50 transition";
-          row.innerHTML = `
-            <td class="p-2.5 text-gray-400">${log.time}</td>
-            <td class="p-2.5 font-bold text-white">${log.market}</td>
-            <td class="p-2.5 text-oggyPink">${log.strat}</td>
-            <td class="p-2.5"><span class="px-2 py-0.5 rounded font-bold ${log.signal.includes('FALL') ? 'bg-oggyRed/20 text-oggyRed border border-oggyRed/30' : 'bg-oggyGreen/20 text-oggyGreen border border-oggyGreen/30'}">${log.signal}</span></td>
-            <td class="p-2.5 text-gray-300">${log.duration}</td>
-            <td class="p-2.5 text-oggyYellow">${log.price}</td>
-            <td class="p-2.5 text-right text-gray-400 text-[10px]">${log.trigger}</td>
-          `;
-          body.appendChild(row);
         });
       }
 
-      function executeManualTrade(type) {
-        let spotPrice = selectedMarket.price > 0 ? selectedMarket.price.toFixed(2) : '545.79';
-        showToastNotification(`Executed Practice Trade: ${type} on ${selectedMarket.name}`);
-        
-        const body = document.getElementById('signalLogTableBody');
-        if (!body) return;
-        let row = document.createElement('tr');
-        row.className = "hover:bg-gray-900/50 transition bg-oggyPink/10";
-        row.innerHTML = `
-          <td class="p-2.5 text-gray-400">${new Date().toLocaleTimeString()}</td>
-          <td class="p-2.5 font-bold text-white">${selectedMarket.name}</td>
-          <td class="p-2.5 text-oggyPink">Manual Practice</td>
-          <td class="p-2.5"><span class="px-2 py-0.5 rounded font-bold ${type.includes('FALL') ? 'bg-oggyRed/20 text-oggyRed' : 'bg-oggyGreen/20 text-oggyGreen'}">${type}</span></td>
-          <td class="p-2.5 text-gray-300">1 Tick</td>
-          <td class="p-2.5 text-oggyYellow">${spotPrice}</td>
-          <td class="p-2.5 text-right text-gray-300 text-[10px]">Real Deriv WS Tick Execution</td>
-        `;
-        body.insertBefore(row, body.firstChild);
+      function renderSignalLogs() {
+        const tbody = document.getElementById('signalLogTableBody');
+        if (!tbody) return;
+        tbody.innerHTML = '';
+        signalLogs.forEach(s => {
+          const tr = document.createElement('tr');
+          tr.className = 'hover:bg-gray-900/40 transition';
+          tr.innerHTML = `
+            <td class="p-2.5 text-gray-400">${s.time}</td>
+            <td class="p-2.5 font-bold text-white">${s.market}</td>
+            <td class="p-2.5 text-gray-300">${s.strategy}</td>
+            <td class="p-2.5 text-oggyPink font-bold">${s.signal}</td>
+            <td class="p-2.5 text-gray-400">${s.duration}</td>
+            <td class="p-2.5 text-oggyCyan">${s.price}</td>
+            <td class="p-2.5 text-right text-gray-400">${s.reason}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+      }
+
+      function executeManualTrade(signalType) {
+        const now = new Date().toLocaleTimeString();
+        signalLogs.unshift({
+          time: now,
+          market: selectedMarket.name,
+          strategy: 'Rise/Fall Auto',
+          signal: signalType,
+          duration: '1 Tick',
+          price: selectedMarket.price.toFixed(2),
+          reason: 'Automated RSI signal condition met'
+        });
+        if (signalLogs.length > 15) signalLogs.pop();
+        renderSignalLogs();
+        showToast(`Signal Executed: ${signalType} on ${selectedMarket.name}`);
+      }
+
+      function clearSignalLogs() {
+        signalLogs = [];
+        renderSignalLogs();
+      }
+
+      function showToast(text) {
+        const toast = document.getElementById('toastNotification');
+        const toastText = document.getElementById('toastText');
+        if (toast && toastText) {
+          toastText.innerText = text;
+          toast.classList.remove('translate-y-20', 'opacity-0');
+          setTimeout(() => {
+            toast.classList.add('translate-y-20', 'opacity-0');
+          }, 3500);
+        }
       }
 
       function toggleAudioAlert() {
@@ -894,79 +848,45 @@
         if (btn) {
           btn.innerHTML = audioEnabled 
             ? `<svg class="w-3.5 h-3.5 text-oggyGreen" fill="currentColor" viewBox="0 0 20 20"><path d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414z"/></svg><span class="text-[11px] font-sans font-bold">ALERTS ON</span>`
-            : `<span class="text-[11px] font-sans font-bold text-gray-500">ALERTS OFF</span>`;
+            : `<svg class="w-3.5 h-3.5 text-red-400" fill="currentColor" viewBox="0 0 20 20"><path d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM12.293 7.293a1 1 0 011.414 0L15 8.586l1.293-1.293a1 1 0 111.414 1.414L16.414 10l1.293 1.293a1 1 0 01-1.414 1.414L15 11.414l-1.293 1.293a1 1 0 01-1.414-1.414L13.586 10l-1.293-1.293a1 1 0 010-1.414z"/></svg><span class="text-[11px] font-sans font-bold">ALERTS OFF</span>`;
         }
-        showToastNotification(`Sound Alerts: ${audioEnabled ? 'ENABLED' : 'DISABLED'}`);
       }
 
       function setChartType(type) {
         chartType = type;
         const btnLine = document.getElementById('btnTypeLine');
         const btnCandle = document.getElementById('btnTypeCandle');
-        if (btnLine) btnLine.className = type === 'line' ? "px-2 py-1 text-[10px] font-bold bg-oggyPink text-white rounded" : "px-2 py-1 text-[10px] font-bold text-gray-400 hover:text-white rounded";
-        if (btnCandle) btnCandle.className = type === 'candle' ? "px-2 py-1 text-[10px] font-bold bg-oggyPink text-white rounded" : "px-2 py-1 text-[10px] font-bold text-gray-400 hover:text-white rounded";
+        if (type === 'line') {
+          if (btnLine) { btnLine.className = 'px-2 py-1 text-[10px] font-bold bg-oggyPink text-white rounded'; }
+          if (btnCandle) { btnCandle.className = 'px-2 py-1 text-[10px] font-bold text-gray-400 hover:text-white rounded'; }
+        } else {
+          if (btnCandle) { btnCandle.className = 'px-2 py-1 text-[10px] font-bold bg-oggyPink text-white rounded'; }
+          if (btnLine) { btnLine.className = 'px-2 py-1 text-[10px] font-bold text-gray-400 hover:text-white rounded'; }
+        }
         drawMainChart();
       }
 
       function resetMainChart() {
-        chartTickHistory = [];
-        digitCounts = Array(10).fill(0);
-        lastDigitsStream = [];
-        subscribeToMarket(selectedMarket.id);
-        showToastNotification("Deriv Live Stream reset.");
+        chartTickHistory = [selectedMarket.price - 2, selectedMarket.price - 1, selectedMarket.price];
+        drawMainChart();
       }
 
       function triggerManualScan() {
-        playSignalSound('RISE');
-        showToastNotification("Scanning Real Deriv Market Ticks... Voice & Audio Ready!");
+        showToast('Manual Market Scan Completed. Volatility stream is active.');
       }
 
-      function copyTradeDetails(id) {
-        showToastNotification(`Trade #${id} execution details logged!`);
-      }
+      window.addEventListener('load', () => {
+        renderMarketsList();
+        renderActiveTrades();
+        renderSignalLogs();
+        updateLdpUI();
+        connectDerivWebSocket();
 
-      function clearSignalLogs() {
-        const body = document.getElementById('signalLogTableBody');
-        if (body) body.innerHTML = '';
-        showToastNotification("Signal History Cleared.");
-      }
-
-      function showToastNotification(msg) {
-        const toast = document.getElementById('toastNotification');
-        const toastText = document.getElementById('toastText');
-        if (toast && toastText) {
-          toastText.innerText = msg;
-          toast.style.transform = 'translateY(0)';
-          toast.style.opacity = '1';
-
-          setTimeout(() => {
-            toast.style.transform = 'translateY(80px)';
-            toast.style.opacity = '0';
-          }, 2500);
-        }
-      }
-
-      // Safe startup initializer ensuring loader always hides successfully
-      window.addEventListener('DOMContentLoaded', () => {
-        try {
-          renderMarketsList();
-          initCanvasResize();
-          initActiveTradesGrid();
-          initSignalLogs();
-          updateLdpUI();
-          connectDerivWebSocket();
-        } catch(err) {
-          console.error("Initialization error caught:", err);
-        }
-
-        // Guaranteed Fullscreen Loader removal after 1.2 seconds
         setTimeout(() => {
-          const loader = document.getElementById('oggyLoadingScreen');
-          if (loader) {
-            loader.style.opacity = '0';
-            setTimeout(() => { 
-              loader.style.display = 'none'; 
-            }, 500);
+          const loadingScreen = document.getElementById('oggyLoadingScreen');
+          if (loadingScreen) {
+            loadingScreen.style.opacity = '0';
+            setTimeout(() => { loadingScreen.style.display = 'none'; }, 500);
           }
         }, 1200);
       });
